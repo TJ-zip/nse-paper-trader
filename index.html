@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PaperTrade NSE — Practice Trading with Virtual Money</title>
+<meta name="description" content="A free beginner-friendly NSE paper trading simulator. Buy and sell stocks with ₹10,00,000 of virtual money. No real money, no risk." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">₹</span>
+      <div>
+        <h1>PaperTrade <span>NSE</span></h1>
+        <p class="tag">Practice trading. Zero real money.</p>
+      </div>
+    </div>
+    <div class="stats" role="group" aria-label="Account summary">
+      <div class="stat">
+        <span class="stat-label">Cash</span>
+        <strong id="statCash">₹0</strong>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Holdings</span>
+        <strong id="statHoldings">₹0</strong>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Total value</span>
+        <strong id="statTotal">₹0</strong>
+      </div>
+      <div class="stat">
+        <span class="stat-label">P&amp;L</span>
+        <strong id="statPnl">₹0</strong>
+      </div>
+    </div>
+  </div>
+  <div class="wrap feedwrap">
+    <span id="feedStatus" class="feed-badge" aria-live="polite">Connecting…</span>
+    <span class="feed-note">Prices refresh every 5 seconds. Educational demo only — not investment advice.</span>
+  </div>
+</header>
+
+<main id="main" class="wrap layout">
+
+  <!-- MARKET WATCH -->
+  <section class="card" aria-labelledby="watchHead">
+    <div class="card-head">
+      <h2 id="watchHead">Market watch</h2>
+      <label class="search">
+        <span class="sr-only">Search a stock</span>
+        <input id="search" type="search" placeholder="Search RELIANCE, TCS…" autocomplete="off" />
+      </label>
+    </div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <caption class="sr-only">Live NSE stock prices with buy and sell actions</caption>
+        <thead>
+          <tr>
+            <th scope="col">Stock</th>
+            <th scope="col" class="num">Price</th>
+            <th scope="col" class="num">Change</th>
+            <th scope="col" class="num">Action</th>
+          </tr>
+        </thead>
+        <tbody id="watchBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ORDER TICKET -->
+  <section class="card" aria-labelledby="orderHead">
+    <div class="card-head"><h2 id="orderHead">Place an order</h2></div>
+    <form id="orderForm" novalidate>
+      <div class="field">
+        <label for="symbol">Stock</label>
+        <select id="symbol" required></select>
+      </div>
+      <div class="field">
+        <label for="qty">Quantity (shares)</label>
+        <input id="qty" type="number" min="1" step="1" value="1" inputmode="numeric" required />
+      </div>
+      <p class="ticket">
+        Market price: <strong id="ticketPrice">₹0.00</strong><br />
+        Estimated cost: <strong id="ticketCost">₹0.00</strong><br />
+        <span id="ticketOwned" class="muted">You own 0 shares</span>
+      </p>
+      <div class="btn-row">
+        <button type="submit" class="btn buy" data-side="BUY">Buy</button>
+        <button type="button" class="btn sell" data-side="SELL">Sell</button>
+      </div>
+      <p id="orderMsg" class="msg" role="status" aria-live="polite"></p>
+    </form>
+    <details class="help">
+      <summary>New to trading? Read this first</summary>
+      <ul>
+        <li><strong>Buy</strong> — you spend virtual cash to own shares.</li>
+        <li><strong>Sell</strong> — you return shares for cash, booking profit or loss.</li>
+        <li><strong>Avg cost</strong> — average price you paid per share.</li>
+        <li><strong>P&amp;L</strong> — profit and loss versus your starting ₹10,00,000.</li>
+        <li>Everything here is virtual. You can never lose real money.</li>
+      </ul>
+    </details>
+  </section>
+
+  <!-- PORTFOLIO -->
+  <section class="card wide" aria-labelledby="pfHead">
+    <div class="card-head">
+      <h2 id="pfHead">Your portfolio</h2>
+      <button id="resetBtn" type="button" class="btn ghost">Reset account</button>
+    </div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <caption class="sr-only">Stocks you currently hold</caption>
+        <thead>
+          <tr>
+            <th scope="col">Stock</th>
+            <th scope="col" class="num">Qty</th>
+            <th scope="col" class="num">Avg cost</th>
+            <th scope="col" class="num">Price</th>
+            <th scope="col" class="num">Value</th>
+            <th scope="col" class="num">P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody id="pfBody"></tbody>
+      </table>
+    </div>
+    <p id="pfEmpty" class="empty">No holdings yet. Buy your first stock from the market watch above.</p>
+  </section>
+
+  <!-- ORDER HISTORY -->
+  <section class="card wide" aria-labelledby="histHead">
+    <div class="card-head"><h2 id="histHead">Order history</h2></div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <caption class="sr-only">Your executed demo orders</caption>
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">Side</th>
+            <th scope="col">Stock</th>
+            <th scope="col" class="num">Qty</th>
+            <th scope="col" class="num">Price</th>
+            <th scope="col" class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <p id="histEmpty" class="empty">No orders yet.</p>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p><strong>Disclaimer:</strong> PaperTrade NSE is a learning simulator. Orders are not sent to any exchange, no real money is used, and quotes may be delayed or simulated when the live feed is unavailable. Nothing here is investment advice.</p>
+</footer>
+
+<script src="./app.js"></script>
+</body>
+</html>
