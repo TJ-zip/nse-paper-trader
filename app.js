@@ -66,13 +66,14 @@ const defaultState = () => ({
   pending: [],                         // {id,sym,side,qty,limit,ts}
   trades: [],                          // {ts,sym,side,qty,price,fee}
   watch: ['NIFTY 50', 'BANKNIFTY', 'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN', 'TATAMOTORS', 'ITC', 'ICICIBANK'],
+  chartType: 'line',                   // line | candle
 });
 
 let S = load();
 let selected = 'RELIANCE';
 let range = '1d';
 const quotes = {};                     // sym -> {price, prev, ts}
-const series = {};                     // sym|range -> {t:[], c:[]}
+const series = {};                     // sym|range -> {t:[], o:[], h:[], l:[], c:[]}
 let feedMode = 'connecting';           // live | sim | connecting
 
 function load() {
@@ -86,6 +87,29 @@ const save = () => localStorage.setItem(LS_KEY, JSON.stringify(S));
 
 /* ----------------------------- helpers ------------------------------ */
 const $ = id => document.getElementById(id);
+const newSeries = () => ({ t: [], o: [], h: [], l: [], c: [] });
+
+/* candle bucket width per range, used when we build bars from live ticks */
+const BUCKET = { '1d': 300000, '5d': 900000, '1mo': 86400000, '6mo': 86400000, '1y': 604800000 };
+
+/* append a tick to a series, extending the current candle or opening a new one */
+function addTick(s, ts, price, bucket) {
+  const n = s.c.length;
+  if (n && ts - s.t[n - 1] < bucket) {
+    s.c[n - 1] = price;
+    if (price > s.h[n - 1]) s.h[n - 1] = price;
+    if (price < s.l[n - 1]) s.l[n - 1] = price;
+    return;
+  }
+  const open = n ? s.c[n - 1] : price;
+  s.t.push(ts); s.o.push(open);
+  s.h.push(Math.max(open, price)); s.l.push(Math.min(open, price)); s.c.push(price);
+}
+
+function trimSeries(s, max) {
+  while (s.c.length > max) { s.t.shift(); s.o.shift(); s.h.shift(); s.l.shift(); s.c.shift(); }
+}
+
 const inr = n => '\u20B9' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sign = n => (n > 0 ? '+' : '') + n.toFixed(2);
 const cls = n => (n > 0 ? 'up' : n < 0 ? 'dn' : '');
@@ -159,7 +183,7 @@ async function pullStooq(sym) {
   const f = line.split(',');                        // Symbol,Date,Time,Open,High,Low,Close,Volume
   const close = parseFloat(f[6]), open = parseFloat(f[3]);
   if (!(close > 0)) return null;
-  return { price: close, prev: open > 0 ? open : close, pts: { t: [], c: [] } };
+  return { price: close, prev: open > 0 ? open : close, pts: newSeries() };
 }
 
 const yUrl = (sym, rng, itv) =>
@@ -179,9 +203,19 @@ async function pullSymbol(sym, rng) {
   if (typeof price !== 'number') return null;
 
   const t = res.timestamp || [];
-  const c = (res.indicators && res.indicators.quote && res.indicators.quote[0].close) || [];
-  const pts = { t: [], c: [] };
-  for (let i = 0; i < t.length; i++) if (typeof c[i] === 'number') { pts.t.push(t[i] * 1000); pts.c.push(c[i]); }
+  const q0 = (res.indicators && res.indicators.quote && res.indicators.quote[0]) || {};
+  const c = q0.close || [], o = q0.open || [], hi = q0.high || [], lo = q0.low || [];
+  const pts = newSeries();
+  for (let i = 0; i < t.length; i++) {
+    if (typeof c[i] !== 'number') continue;
+    const close = c[i];
+    const open = typeof o[i] === 'number' ? o[i] : (pts.c.length ? pts.c[pts.c.length - 1] : close);
+    pts.t.push(t[i] * 1000);
+    pts.o.push(open);
+    pts.h.push(typeof hi[i] === 'number' ? hi[i] : Math.max(open, close));
+    pts.l.push(typeof lo[i] === 'number' ? lo[i] : Math.min(open, close));
+    pts.c.push(close);
+  }
   return { price, prev, pts };
 }
 
@@ -189,11 +223,18 @@ async function pullSymbol(sym, rng) {
 function simTick(sym) {
   const q = quotes[sym];
   const base = META[sym] ? META[sym].base : 100;
-  if (!q) {
-    const prev = base * (1 + (Math.random() - 0.5) * 0.02);
-    const pts = { t: [], c: [] };
+  if (!q || !series[sym + '|1d']) {
+    const seed = q && q.price ? q.price : base;
+    const prev = seed * (1 + (Math.random() - 0.5) * 0.02);
+    const pts = newSeries();
     let p = prev, now = Date.now();
-    for (let i = 74; i >= 0; i--) { p *= 1 + (Math.random() - 0.5) * 0.004; pts.t.push(now - i * 300000); pts.c.push(p); }
+    for (let i = 74; i >= 0; i--) {
+      const open = p, t = now - i * 300000;
+      p *= 1 + (Math.random() - 0.5) * 0.004;
+      pts.t.push(t); pts.o.push(open); pts.c.push(p);
+      pts.h.push(Math.max(open, p) * (1 + Math.random() * 0.0015));
+      pts.l.push(Math.min(open, p) * (1 - Math.random() * 0.0015));
+    }
     quotes[sym] = { price: p, prev, ts: Date.now() };
     series[sym + '|1d'] = pts;
     return;
@@ -201,17 +242,19 @@ function simTick(sym) {
   const vol = isIndex(sym) ? 0.0006 : 0.0015;
   q.price = Math.max(0.5, q.price * (1 + (Math.random() - 0.5) * 2 * vol));
   q.ts = Date.now();
-  const k = sym + '|1d', s = series[k];
-  if (s) { s.t.push(Date.now()); s.c.push(q.price); if (s.t.length > 300) { s.t.shift(); s.c.shift(); } }
+  const s = series[sym + '|1d'];
+  if (s) { addTick(s, Date.now(), q.price, BUCKET['1d']); trimSeries(s, 300); }
 }
 
 /* keep a rolling intraday series from live ticks when the provider sends no history */
 function pushLive(sym, price, prev) {
   const k = sym + '|1d';
-  if (!series[k] || !series[k].c.length) series[k] = { t: [Date.now() - 60000], c: [prev || price] };
-  const s = series[k];
-  s.t.push(Date.now()); s.c.push(price);
-  if (s.t.length > 400) { s.t.shift(); s.c.shift(); }
+  if (!series[k] || !series[k].c.length) {
+    const base = prev || price;
+    series[k] = { t: [Date.now() - 60000], o: [base], h: [base], l: [base], c: [base] };
+  }
+  addTick(series[k], Date.now(), price, BUCKET['1d']);
+  trimSeries(series[k], 400);
 }
 
 function activeSymbols() {
@@ -246,21 +289,35 @@ async function refresh() {
   renderAll();
 }
 
+/* build a plausible OHLC series when no provider data is available */
+function synthSeries(sym, rng) {
+  const q = quotes[sym] || { price: META[sym] ? META[sym].base : 100 };
+  const n = { '1d': 75, '5d': 130, '1mo': 22, '6mo': 130, '1y': 52 }[rng] || 75;
+  const step = BUCKET[rng] || 3e5;
+  const pts = newSeries();
+  let p = q.price / (1 + (Math.random() - 0.5) * 0.2);
+  for (let i = n; i >= 0; i--) {
+    const open = p;
+    p *= 1 + (Math.random() - 0.5) * 0.02;
+    pts.t.push(Date.now() - i * step); pts.o.push(open); pts.c.push(p);
+    pts.h.push(Math.max(open, p) * (1 + Math.random() * 0.004));
+    pts.l.push(Math.min(open, p) * (1 - Math.random() * 0.004));
+  }
+  const last = pts.c.length - 1;
+  pts.c[last] = q.price;
+  pts.h[last] = Math.max(pts.h[last], q.price);
+  pts.l[last] = Math.min(pts.l[last], q.price);
+  return pts;
+}
+
 /* fetch a longer-range series for the chart when the user changes range */
 async function loadRange(sym, rng) {
   const key = sym + '|' + rng;
   if (series[key] && rng !== '1d') { drawChart(); return; }
-  if (feedMode === 'sim') { // synthesise
-    const q = quotes[sym] || { price: META[sym].base };
-    const n = { '1d': 75, '5d': 130, '1mo': 22, '6mo': 130, '1y': 52 }[rng] || 75;
-    let p = q.price / (1 + (Math.random() - 0.5) * 0.2);
-    const pts = { t: [], c: [] }, step = { '1d': 3e5, '5d': 9e5, '1mo': 864e5, '6mo': 864e5, '1y': 6048e5 }[rng];
-    for (let i = n; i >= 0; i--) { p *= 1 + (Math.random() - 0.5) * 0.02; pts.t.push(Date.now() - i * step); pts.c.push(p); }
-    pts.c[pts.c.length - 1] = q.price;
-    series[key] = pts; drawChart(); return;
-  }
-  const d = await pullSymbol(sym, rng);
+  if (feedMode === 'sim') { series[key] = synthSeries(sym, rng); drawChart(); return; }
+  const d = await pullSymbol(sym, rng).catch(() => null);
   if (d && d.pts.c.length) series[key] = d.pts;
+  else if (!series[key]) series[key] = synthSeries(sym, rng);    // never leave the chart blank
   drawChart();
 }
 
@@ -451,7 +508,9 @@ function drawChart() {
     x.fillText('Loading chart…', w / 2, h / 2); return;
   }
   const c = s.c, pad = { l: 8, r: 58, t: 12, b: 18 };
-  const min = Math.min.apply(null, c), max = Math.max.apply(null, c), span = (max - min) || 1;
+  const candle = S.chartType === 'candle' && s.o && s.o.length === c.length;
+  const lows = candle ? s.l : c, highs = candle ? s.h : c;
+  const min = Math.min.apply(null, lows), max = Math.max.apply(null, highs), span = (max - min) || 1;
   const X = i => pad.l + (i / (c.length - 1)) * (w - pad.l - pad.r);
   const Y = v => pad.t + (1 - (v - min) / span) * (h - pad.t - pad.b);
   const rising = c[c.length - 1] >= c[0];
@@ -465,6 +524,9 @@ function drawChart() {
     x.beginPath(); x.moveTo(pad.l, y); x.lineTo(w - pad.r, y); x.stroke();
     x.fillText(v.toFixed(2), w - pad.r + 6, y + 3);
   }
+
+  if (candle) { drawCandles(x, s, X, Y, w, h, pad); return; }
+
   // area fill
   const g = x.createLinearGradient(0, pad.t, 0, h);
   g.addColorStop(0, rising ? 'rgba(22,199,132,.30)' : 'rgba(234,57,67,.30)');
@@ -481,6 +543,27 @@ function drawChart() {
   x.beginPath(); x.arc(X(c.length - 1), Y(c[c.length - 1]), 3.5, 0, 7); x.fillStyle = col; x.fill();
 }
 
+/* OHLC candlesticks: green body when the candle closed up, red when it closed down */
+function drawCandles(x, s, X, Y, w, h, pad) {
+  const n = s.c.length;
+  const slot = (w - pad.l - pad.r) / Math.max(1, n - 1);
+  const bw = Math.max(1, Math.min(14, slot * 0.68));
+  for (let i = 0; i < n; i++) {
+    const o = s.o[i], c = s.c[i], hi = s.h[i], lo = s.l[i];
+    const col = c >= o ? '#16c784' : '#ea3943';
+    const cx = X(i);
+    // wick
+    x.strokeStyle = col; x.lineWidth = Math.max(1, bw * 0.16);
+    x.beginPath(); x.moveTo(cx, Y(hi)); x.lineTo(cx, Y(lo)); x.stroke();
+    // body
+    const yo = Y(o), yc = Y(c);
+    const top = Math.min(yo, yc);
+    const bh = Math.max(1, Math.abs(yc - yo));
+    x.fillStyle = col;
+    x.fillRect(cx - bw / 2, top, bw, bh);
+  }
+}
+
 /* ------------------------------ events ------------------------------ */
 function selectSymbol(sym) {
   if (!META[sym]) return;
@@ -488,6 +571,14 @@ function selectSymbol(sym) {
   if (!isIndex(sym)) $('oSymbol').value = sym;
   renderQuote();
   loadRange(sym, range);
+}
+
+function setChartType(type) {
+  S.chartType = type === 'candle' ? 'candle' : 'line';
+  save();
+  document.querySelectorAll('#typeBtns button').forEach(o =>
+    o.classList.toggle('on', o.dataset.c === S.chartType));
+  drawChart();
 }
 
 function bind() {
@@ -543,6 +634,13 @@ function bind() {
     document.querySelectorAll('#rangeBtns button').forEach(o => o.classList.remove('on'));
     b.classList.add('on'); range = b.dataset.r; loadRange(selected, range);
   });
+
+  $('typeBtns').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    setChartType(b.dataset.c);
+    toast(S.chartType === 'candle' ? 'Candlestick chart' : 'Line chart');
+  });
+  setChartType(S.chartType || 'line');
 
   $('btnReset').onclick = () => {
     if (!confirm('Reset your paper account back to \u20B910,00,000? All positions and history will be erased.')) return;
