@@ -59,12 +59,18 @@
     <section class="panel">
       <div class="panel-head">
         <h2 id="chartTitle">RELIANCE</h2>
-        <div class="range" id="rangeBtns">
-          <button data-r="1d" class="on">1D</button>
-          <button data-r="5d">5D</button>
-          <button data-r="1mo">1M</button>
-          <button data-r="6mo">6M</button>
-          <button data-r="1y">1Y</button>
+        <div class="chart-tools">
+          <div class="range" id="typeBtns" title="Chart style">
+            <button data-c="line" class="on">Line</button>
+            <button data-c="candle">Candles</button>
+          </div>
+          <div class="range" id="rangeBtns">
+            <button data-r="1d" class="on">1D</button>
+            <button data-r="5d">5D</button>
+            <button data-r="1mo">1M</button>
+            <button data-r="6mo">6M</button>
+            <button data-r="1y">1Y</button>
+          </div>
         </div>
       </div>
       <div class="quote">
@@ -144,7 +150,8 @@
       <div><h3>1. Virtual capital</h3><p>You start with <strong>₹10,00,000</strong> of virtual cash. Nothing is real, no signup, no money at risk.</p></div>
       <div><h3>2. Live prices</h3><p>Quotes for NSE stocks and indices are pulled from a public market data feed and refresh every few seconds during market hours (9:15 AM – 3:30 PM IST, Mon–Fri).</p></div>
       <div><h3>3. Realistic fills</h3><p>Market orders fill at the last traded price. Limit orders wait in the book. Brokerage of ₹20 per executed order is deducted, like a discount broker.</p></div>
-      <div><h3>4. Track performance</h3><p>Positions, average price, unrealised and realised P&amp;L are computed live and stored in your browser.</p></div>
+      <div><h3>4. Read the chart</h3><p>Switch between a <strong>line</strong> chart and a <strong>candlestick</strong> chart, and between 1D, 5D, 1M, 6M and 1Y ranges. Each candle shows open, high, low and close — green when it closed up, red when it closed down.</p></div>
+      <div><h3>5. Track performance</h3><p>Positions, average price, unrealised and realised P&amp;L are computed live and stored in your browser.</p></div>
     </div>
     <p class="disclaimer"><strong>Disclaimer:</strong> This is an educational simulator. Prices are sourced from free public endpoints, may be delayed or approximate, and must not be used for real investment decisions. If the live feed is unreachable, the app switches to a clearly-labelled simulated feed so you can keep practising.</p>
   </section>
