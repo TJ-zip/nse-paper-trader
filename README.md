@@ -11,7 +11,7 @@ A free, zero-install **paper trading simulator for the Indian stock market (NSE)
 - **Market and limit orders.** Limit orders rest in an order book and fill automatically when the live price touches your price.
 - **Realistic costs** — ₹20 brokerage per executed order, like a discount broker.
 - **Live portfolio maths** — average price, holdings value, unrealised P&L, realised P&L, total equity and overall return.
-- **Interactive price chart** (custom HTML5 canvas) with 1D / 5D / 1M / 6M / 1Y ranges.
+- **Line and candlestick charts.** Toggle between a filled line chart and full **OHLC candlesticks** (green when the candle closed up, red when it closed down) over 1D / 5D / 1M / 6M / 1Y ranges. Everything is drawn on a plain HTML5 canvas — no charting library. Your choice is remembered between visits, and intraday ticks are aggregated into candles as they arrive.
 - **Watchlist** with add/remove, one-click B/S buttons, and a scrolling market ticker.
 - **Market status** badge (NSE open 9:15 AM – 3:30 PM IST, Mon–Fri) and a live IST clock.
 - **Everything is saved in `localStorage`**, so your portfolio survives a refresh. Trades export to CSV.
@@ -23,7 +23,7 @@ A free, zero-install **paper trading simulator for the Indian stock market (NSE)
 |---|---|
 | `index.html` | Page structure |
 | `styles.css` | Dark terminal theme, responsive layout |
-| `app.js` | Data feed, order engine, portfolio maths, canvas chart |
+| `app.js` | Data feed, order engine, portfolio maths, line + candlestick charts |
 | `.nojekyll` | Tells GitHub Pages to serve the files as-is |
 
 ## Enable GitHub Pages
