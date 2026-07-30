@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NSE Paper Trader — Practice Trading with Live Indian Market Prices</title>
+<meta name="description" content="A free, browser-based paper trading simulator for NSE stocks. Practice buying and selling with virtual money and live market prices." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">📈</span>
+    <div>
+      <h1>NSE Paper Trader</h1>
+      <p class="tag">Practice trading. Real prices. Zero risk.</p>
+    </div>
+  </div>
+  <div class="status">
+    <span id="marketBadge" class="badge">…</span>
+    <span id="feedBadge" class="badge feed">Connecting…</span>
+    <span id="clock" class="clock"></span>
+  </div>
+</header>
+
+<div id="ticker" class="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
+
+<main>
+  <!-- ACCOUNT SUMMARY -->
+  <section class="cards" id="summary">
+    <div class="card"><span class="k">Total Equity</span><strong id="sEquity">—</strong><span class="sub" id="sEquitySub">&nbsp;</span></div>
+    <div class="card"><span class="k">Available Cash</span><strong id="sCash">—</strong><span class="sub">Buying power</span></div>
+    <div class="card"><span class="k">Holdings Value</span><strong id="sHoldings">—</strong><span class="sub" id="sHoldCount">0 positions</span></div>
+    <div class="card"><span class="k">Unrealised P&amp;L</span><strong id="sUnreal">—</strong><span class="sub" id="sUnrealPct">&nbsp;</span></div>
+    <div class="card"><span class="k">Realised P&amp;L</span><strong id="sReal">—</strong><span class="sub">Booked profit/loss</span></div>
+  </section>
+
+  <div class="grid">
+    <!-- LEFT: WATCHLIST -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Watchlist</h2>
+        <form id="addForm" class="addform" autocomplete="off">
+          <input id="addInput" list="symbolList" placeholder="Add symbol e.g. TCS" maxlength="20" />
+          <datalist id="symbolList"></datalist>
+          <button type="submit" class="btn tiny">Add</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl" id="watchTable">
+          <thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Chg%</th><th class="r">Trade</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CENTER: CHART + ORDER -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="chartTitle">RELIANCE</h2>
+        <div class="range" id="rangeBtns">
+          <button data-r="1d" class="on">1D</button>
+          <button data-r="5d">5D</button>
+          <button data-r="1mo">1M</button>
+          <button data-r="6mo">6M</button>
+          <button data-r="1y">1Y</button>
+        </div>
+      </div>
+      <div class="quote">
+        <span id="qPrice" class="price">—</span>
+        <span id="qChange" class="chg">—</span>
+        <span id="qName" class="name"></span>
+      </div>
+      <canvas id="chart" height="240"></canvas>
+
+      <div class="order">
+        <div class="order-row">
+          <label>Symbol
+            <input id="oSymbol" list="symbolList" value="RELIANCE" />
+          </label>
+          <label>Qty
+            <input id="oQty" type="number" min="1" step="1" value="1" />
+          </label>
+          <label>Order type
+            <select id="oType">
+              <option value="MARKET">Market</option>
+              <option value="LIMIT">Limit</option>
+            </select>
+          </label>
+          <label id="oLimitWrap" class="hide">Limit price
+            <input id="oLimit" type="number" min="0.05" step="0.05" />
+          </label>
+        </div>
+        <div class="order-row">
+          <div class="est" id="oEst">Estimated cost: —</div>
+          <button class="btn buy" id="btnBuy">BUY</button>
+          <button class="btn sell" id="btnSell">SELL</button>
+        </div>
+        <p class="hint">Limit orders rest in the book and execute automatically when the live price touches your price.</p>
+      </div>
+    </section>
+
+    <!-- RIGHT: POSITIONS / ORDERS -->
+    <section class="panel">
+      <div class="panel-head tabs">
+        <button class="tab on" data-tab="pos">Positions</button>
+        <button class="tab" data-tab="pend">Pending</button>
+        <button class="tab" data-tab="hist">History</button>
+      </div>
+      <div class="table-wrap" id="tab-pos">
+        <table class="tbl" id="posTable">
+          <thead><tr><th>Symbol</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th class="r">P&amp;L</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty" id="posEmpty">No open positions. Place your first trade!</p>
+      </div>
+      <div class="table-wrap hide" id="tab-pend">
+        <table class="tbl" id="pendTable">
+          <thead><tr><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Limit</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty" id="pendEmpty">No pending orders.</p>
+      </div>
+      <div class="table-wrap hide" id="tab-hist">
+        <table class="tbl" id="histTable">
+          <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Price</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty" id="histEmpty">No trades yet.</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="footerbar">
+    <button class="btn ghost" id="btnReset">Reset account (₹10,00,000)</button>
+    <button class="btn ghost" id="btnExport">Export trades (CSV)</button>
+    <span class="save">Portfolio auto-saved in your browser</span>
+  </section>
+
+  <section class="about">
+    <h2>How it works</h2>
+    <div class="about-grid">
+      <div><h3>1. Virtual capital</h3><p>You start with <strong>₹10,00,000</strong> of virtual cash. Nothing is real, no signup, no money at risk.</p></div>
+      <div><h3>2. Live prices</h3><p>Quotes for NSE stocks and indices are pulled from a public market data feed and refresh every few seconds during market hours (9:15 AM – 3:30 PM IST, Mon–Fri).</p></div>
+      <div><h3>3. Realistic fills</h3><p>Market orders fill at the last traded price. Limit orders wait in the book. Brokerage of ₹20 per executed order is deducted, like a discount broker.</p></div>
+      <div><h3>4. Track performance</h3><p>Positions, average price, unrealised and realised P&amp;L are computed live and stored in your browser.</p></div>
+    </div>
+    <p class="disclaimer"><strong>Disclaimer:</strong> This is an educational simulator. Prices are sourced from free public endpoints, may be delayed or approximate, and must not be used for real investment decisions. If the live feed is unreachable, the app switches to a clearly-labelled simulated feed so you can keep practising.</p>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
