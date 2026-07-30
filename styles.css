@@ -90,6 +90,8 @@ input:focus,select:focus{outline:1px solid var(--acc)}
 .chg{font-size:14px;font-weight:600}
 .name{color:var(--mut);font-size:12px}
 canvas{width:100%;display:block;border-radius:8px;background:#0e1530;border:1px solid var(--line)}
+.chart-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.range{display:flex;gap:4px;flex-wrap:wrap}
 .range button{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
 .range button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .tabs{gap:6px}
